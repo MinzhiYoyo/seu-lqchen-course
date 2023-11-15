@@ -1,6 +1,61 @@
 import wave
 import numpy as np
-from public_function.public_fun import image2array, bytes_save_image, sort_by_energy_analyze, diff_with_two_image
+from public_function.public_fun import image2array, bytes_save_image, sort_by_energy_analyze, diff_with_two_image, diff_with_two_bytes
+
+def embed_extract_bytes(audio_path:str, data: int | np.ndarray, save = False):
+    """
+    在embed_bytes中嵌入比特流，并且会自动调节能量窗口的大小。并且解析数据，然后计算差异率
+    :param audio_path: 音频文件路径
+    :param data: int或者np.ndarray，如果是int，那么表示随机生成data字节的比特流。如果是ndarray，那么就使用这个比特流作为嵌入数据
+    :return:
+    """
+
+    with wave.open(audio_path, 'rb') as audio:
+        params = audio.getparams()
+        rate = audio.getframerate()  # 采样率
+        frames_num = audio.getnframes()
+        audio_array = np.frombuffer(audio.readframes(frames_num), dtype=np.uint16).copy()
+
+    # 计算最大的window_size
+    if isinstance(data, int):
+        data = np.random.randint(0,255 , size=data, dtype=np.uint8)
+
+    data_length = len(data)
+
+    # 计算最大的window_size
+    max_window_size = len(audio_array) // data_length // 8 - 1
+
+    sort_index = sort_by_energy_analyze(audio_array, max_window_size)
+
+    for i in range(data_length):
+        for j in range(8):
+            tmp_index = sort_index[i*8+j]*max_window_size+max_window_size//2
+            audio_array[tmp_index] &= 0xFFFE
+            audio_array[tmp_index] |= ((data[i] >> (7-j)) & 0x01)
+
+    # 是否需要保存
+    if save:
+        name = audio_path.split('.')[0] + '_' + str(data_length) + '.wav'
+        with wave.open(name, 'wb') as audio_file:
+            audio_file.setparams(params)
+            audio_file.writeframes(audio_array)
+
+    # 提取信息
+    embed_audio_array = audio_array.copy()
+    # debug_sort = sort_index.copy()
+    sort_index = sort_by_energy_analyze(embed_audio_array, max_window_size)
+    extract_data = b''
+    # debug_data = []
+    for i in range(data_length):
+        tmp = int(0)
+        for j in range(8):
+            tmp <<= 1
+            tmp |= (int(embed_audio_array[sort_index[i*8+j]*max_window_size+max_window_size//2]) & 0x1)
+        extract_data += tmp.to_bytes(1, 'big')
+        # debug_data.append(tmp)
+
+    return max_window_size, diff_with_two_bytes(data.tobytes(), extract_data)
+
 
 
 def embed_image(audio_path, image_path, output_path, window_size=None, embedded_mode='adaptive_LSB'):
@@ -21,6 +76,7 @@ def embed_image(audio_path, image_path, output_path, window_size=None, embedded_
     audio = wave.open(audio_path, 'rb')
     audio_frames = audio.readframes(audio.getnframes())
     audio_array = np.frombuffer(audio_frames, dtype=np.uint16).copy()
+    audio.close()
     sort_index_by_energy = None
     if embedded_mode in ['adaptive_LSB', 'adaptive_LSB_nosort']:
         sort_index_by_energy = sort_by_energy_analyze(audio_array, window_size)

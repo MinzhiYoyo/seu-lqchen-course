@@ -1,6 +1,19 @@
 from PIL import Image
 import numpy as np
 
+# 比较两个比特流的差异性
+def diff_with_two_bytes(bytes1, bytes2, is_bites = True):
+    if len(bytes1) != len(bytes2):
+        raise ValueError("比特流长度不一样")
+
+    total_length = len(bytes1)
+    if is_bites:
+        total_length *= 8
+        differences = sum(bin(b1 ^ b2).count('1') for b1, b2 in zip(bytes1, bytes2))
+    else:
+        differences = sum(b1 != b2 for b1, b2 in zip(bytes1, bytes1))
+    return 0 if differences == 0 else differences / total_length
+
 # 比较两张图片的差异性，返回百分值
 def diff_with_two_image(image1_path, image2_path, is_bits = True):
     """
@@ -13,22 +26,10 @@ def diff_with_two_image(image1_path, image2_path, is_bits = True):
     image1 = Image.open(image1_path)
     image2 = Image.open(image2_path)
 
-
-
     image1_bytes = image1.tobytes()
     image2_bytes = image2.tobytes()
+    return diff_with_two_bytes(image1_bytes, image2_bytes)
 
-    if len(image2_bytes) != len(image1_bytes):
-        raise ValueError("两个图片长度不一样")
-
-    total_bits = len(image1_bytes)
-    if is_bits:
-        total_bits = len(image1_bytes) * 8
-        differences = sum(bin(b1 ^ b2).count('1') for b1, b2 in zip(image1_bytes, image2_bytes))
-    else:
-        differences = sum(b1 != b2 for b1, b2 in zip(image1_bytes, image2_bytes))
-
-    return differences / total_bits
 
 
 
@@ -92,7 +93,8 @@ def sort_by_energy_analyze(audio_array: np.ndarray, window_size: int):
     """
     if not window_size:
         raise ValueError('能量分析中，没有指定能量窗口大小')
-    index = range(0, len(audio_array), window_size)
+    index = range(0, len(audio_array), window_size)[:-1]
+
     energys = np.zeros(len(index))
     for j, i in enumerate(index):
         energys[j] = (np.sum(audio_array[i * window_size:(i + 1) * window_size] ** 2))
