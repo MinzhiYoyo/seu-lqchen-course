@@ -2,6 +2,8 @@ import wave
 import numpy as np
 from public_function.public_fun import image2array, bytes_save_image, sort_by_energy_analyze, diff_with_two_image, diff_with_two_bytes
 
+
+
 def embed_extract_bytes(audio_path:str, data: int | np.ndarray, save = False):
     """
     在embed_bytes中嵌入比特流，并且会自动调节能量窗口的大小。并且解析数据，然后计算差异率
