@@ -1,3 +1,5 @@
+from PIL import Image
+from public_function.public_fun import png_to_gray_image
 from audio_hiding import embed_extract_bytes, embed_image, extract_image, diff_with_two_image
 import tqdm
 import wave
@@ -118,20 +120,26 @@ def add_noise(image_path,output_audio_path,image_size, window_size, width_height
     return 100 * diff_with_two_image(image_path, 'noise_{}.png'.format(noise_level))
 
 if __name__ == "__main__":
-    audio_path = '启动.wav'
-    image_path = 'seu_light.png'
-
+    src_image = 'seu_square.png'
+    audio_path = 'riverflow.wav'
+    image_path = 'seu_gray.jpeg'
+    # 先将图片灰度化
+    png_to_gray_image(src_image, image_path)
     # 模式3，自适应lsb，且不需要传递嵌入位置
     mode3 = 'adaptive_LSB_nosort'
     mode3_audio_path = 'mode3_audio.wav'  # 带有隐藏信息的音频路径
     mode3_extract_path = 'mode3_image.png'  # 提取出来的图片路径
-    mode3_window_size = 99
+    mode3_window_size = 297
+
+    # 获取输入图的宽高
+    image = Image.open(image_path)
+    w_h = image.size
 
     # 模式3，实验
     image_size = embed_image(audio_path, image_path, mode3_audio_path, mode3_window_size, embedded_mode=mode3)
-    extract_image(mode3_audio_path, mode3_extract_path, image_size, mode3_window_size, mode3, width_height=(25, 25))
+    extract_image(mode3_audio_path, mode3_extract_path, image_size, mode3_window_size, mode3, width_height=w_h)
     # 比较两张图的差异性
-    print("源图像与目标图像的差异：{} %".format(100 * diff_with_two_image('seu_light.png', mode3_extract_path)))
+    print("源图像与目标图像的差异：{} %".format(100 * diff_with_two_image(image_path, mode3_extract_path)))
 
     # 计算信噪比
     snr = calculate_snr(audio_path, mode3_audio_path)
@@ -145,18 +153,18 @@ if __name__ == "__main__":
     low_freq = 1000
     high_freq = 10000
     # 低通滤波
-    low_pass_diff = filter_attack_test(image_path, mode3_audio_path, image_size, mode3_window_size, 'low_pass', cutoff_frequency=low_freq, width_height=(25,25), mode=mode3)
+    low_pass_diff = filter_attack_test(image_path, mode3_audio_path, image_size, mode3_window_size, 'low_pass', cutoff_frequency=low_freq, width_height=w_h, mode=mode3)
     print("低通滤波后的图像差异：{} %".format(low_pass_diff))
     # 高通滤波
-    high_pass_diff = filter_attack_test(image_path, mode3_audio_path, image_size, mode3_window_size, 'high_pass', cutoff_frequency=high_freq, width_height=(25,25), mode=mode3)
+    high_pass_diff = filter_attack_test(image_path, mode3_audio_path, image_size, mode3_window_size, 'high_pass', cutoff_frequency=high_freq, width_height=w_h, mode=mode3)
     print("高通滤波后的图像差异：{} %".format(high_pass_diff))
     # 带通滤波
-    band_pass_diff = filter_attack_test(image_path, mode3_audio_path, image_size, mode3_window_size, 'band_pass', cutoff_frequency=low_freq, width_height=(25,25), mode=mode3, hight_frequency=high_freq)
+    band_pass_diff = filter_attack_test(image_path, mode3_audio_path, image_size, mode3_window_size, 'band_pass', cutoff_frequency=low_freq, width_height=w_h, mode=mode3, hight_frequency=high_freq)
     print("带通滤波后的图像差异：{} %".format(band_pass_diff))
 
     # 白噪声测试
-    noise_level = 0.3
-    noise_diff = add_noise(image_path, mode3_audio_path, image_size, mode3_window_size, width_height=(25,25), mode=mode3, noise_level=noise_level)
+    noise_level = 0.05
+    noise_diff = add_noise(image_path, mode3_audio_path, image_size, mode3_window_size, width_height=w_h, mode=mode3, noise_level=noise_level)
     print("加入噪声等级 {} 后的图像差异：{} %".format(noise_level, noise_diff))
 
 

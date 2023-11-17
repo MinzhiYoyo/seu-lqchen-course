@@ -89,6 +89,10 @@ def embed_image(audio_path, image_path, output_path, window_size=None, embedded_
         need_embedded_size = False
     image_array = image2array(image_path, need_embedded_size=need_embedded_size)
 
+    # 计算最大的window_size
+    max_window_size = len(audio_array)//len(image_array)//8-1
+    if window_size and window_size > max_window_size:
+        raise ValueError("你设置的 window_size = {} 超过了能承受的最大 max_window_size = {}".format(window_size, max_window_size))
 
     # 确保图像和音频大小匹配
     if len(audio_array) < len(image_array) * 8 + 8:
@@ -97,14 +101,45 @@ def embed_image(audio_path, image_path, output_path, window_size=None, embedded_
     # 嵌入图像数据到音频中
     for i in range(len(image_array)):
         for j in range(8):
-            tmp_index = None
             if embedded_mode == 'lsb':
                 tmp_index = i * 8 + j
-            elif (embedded_mode in ['adaptive_LSB', 'adaptive_LSB_nosort']):
-                tmp_index = sort_index_by_energy[i * 8 + j] * window_size + window_size // 2
-            if tmp_index:
                 audio_array[tmp_index] &= 0xFFFE
                 audio_array[tmp_index] |= ((image_array[i] >> (7 - j)) & 0x1)
+            elif (embedded_mode in ['adaptive_LSB', 'adaptive_LSB_nosort']):
+                # 改成统计性，如果最低位0多，就是0，否则就是1
+                # audio的区间是
+                tmp_index = sort_index_by_energy[i * 8 + j] * window_size
+                # 获取最低位为0的所有下标
+                index_0 = np.where((audio_array[tmp_index: tmp_index + window_size] & 0x1) == 0)[0]+tmp_index
+                # 获取最低位为1的所有下标
+                index_1 = np.where((audio_array[tmp_index: tmp_index + window_size] & 0x1) == 1)[0]+tmp_index
+
+                # 看需要0多还是需要1多, target为True表示需要1多，False表示需要0多
+                target = True if ((image_array[i] >> (7 - j)) & 0x1) > 0 else False
+
+
+                if target and len(index_0) > len(index_1):
+                    # 如果需要1多，但是0略多，所以需要随机把部分0变成1，直到1多
+                    # 随机选择index_0中的一些下标，然后将其变成1
+                    # 随机选择的数量
+                    random_num = len(index_0) - len(index_1)
+                    # 随机选择的下标
+                    random_index = np.random.choice(index_0, random_num, replace=False)
+                    # 将随机下标变成1
+                    audio_array[random_index] |= 0x1
+
+                elif not target and len(index_0) < len(index_1):
+                    # 如果需要0多，但是1略多，所以需要随机把部分1变成0，直到0多
+                    # 随机选择index_1中的一些下标，然后将其变成0
+                    # 随机选择的数量
+                    random_num = len(index_1) - len(index_0)
+                    # 随机选择的下标
+                    random_index = np.random.choice(index_1, random_num, replace=False)
+                    # 将随机下标变成0
+                    audio_array[random_index] &= 0xFFFE
+
+
+
 
     # 将嵌入图像的音频写入新文件
     with wave.open(output_path, 'wb') as embedded_audio:
@@ -150,15 +185,28 @@ def extract_image(embedded_audio_path, output_image_path, sort_index_or_length=N
     for i in range(image_size):
         tmp = int(0)
         for j in range(8):
-            tmp_index = None
-
             if extract_mode == 'lsb':
                 tmp_index = 8 * i + j
-            elif extract_mode == 'adaptive_LSB' or extract_mode == 'adaptive_LSB_nosort':
-                tmp_index = sort_index_or_length[i * 8 + j] * window_size + window_size // 2
-            if tmp_index:
                 tmp <<= 1
                 tmp |= (int(embedded_audio_array[tmp_index]) & 0x1)
+            elif extract_mode == 'adaptive_LSB' or extract_mode == 'adaptive_LSB_nosort':
+                tmp_index = sort_index_or_length[i * 8 + j] * window_size
+                # 计算0的个数
+                num_0 = np.sum((embedded_audio_array[tmp_index: tmp_index + window_size] & 0x1) == 0)
+                # 根据0的个数和window_size来计算1的个数
+                num_1 = window_size - num_0
+
+                # 看0多还是1多，来决定tmp最低位添加0还是1
+                if num_0 > num_1:
+                    tmp <<= 1
+                    tmp |= 0x0
+                else:
+                    tmp <<= 1
+                    tmp |= 0x1
+
+
+
+
         extract_image_data += tmp.to_bytes(1, 'big')
 
     # 保存图像

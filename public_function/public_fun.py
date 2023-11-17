@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageOps
 import numpy as np
 
 # 比较两个比特流的差异性
@@ -47,8 +47,8 @@ def image2array(image_path, need_embedded_size = True):
     """
     # 使用RGB排列的方式
     image = Image.open(image_path)
-    if not image.mode == 'RGBA':
-        raise ValueError("要求输入图片是png的类型（图片必须以RGBA的形式保存）")
+    if not image.mode == 'L':
+        raise ValueError("要求输入图片是灰度（图片必须以JPEG的形式保存的灰度）")
     ret = image.tobytes()
 
     if not need_embedded_size:
@@ -61,7 +61,7 @@ def image2array(image_path, need_embedded_size = True):
 
 
 # 字节流转图片
-def bytes_save_image(bytes_stream, output_path, image_mode='RGBA', width_height=None):
+def bytes_save_image(bytes_stream, output_path, image_mode='L', width_height=None):
 
     # 使用直接写入的方式
     # with open(output_path, 'wb') as f:
@@ -71,7 +71,7 @@ def bytes_save_image(bytes_stream, output_path, image_mode='RGBA', width_height=
     从字节流中保存图片
     :param bytes_stream: 字节流，要求类型是bytes，并没有做类型检查
     :param output_path: 输出路径，要求类型是str，并没有做类型检查
-    :param image_mode: 图片的模式，默认是RGBA，暂且不支持其他模式
+    :param image_mode: 图片的模式，默认是JPEG，暂且不支持其他模式
     :return: None
     """
 
@@ -99,3 +99,10 @@ def sort_by_energy_analyze(audio_array: np.ndarray, window_size: int):
     for j, i in enumerate(index):
         energys[j] = (np.sum(audio_array[i * window_size:(i + 1) * window_size] ** 2))
     return energys.argsort()[::-1]
+
+def png_to_gray_image(input, output):
+    image = Image.open(input)
+    image = image.convert('L')
+    image = ImageOps.invert(image)
+    image.save(output)
+
