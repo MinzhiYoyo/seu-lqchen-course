@@ -15,6 +15,8 @@ def bits_error_rate_analysis():
     with open('误码率结果.txt', 'w') as f:
         f.write(output_str)
 
+# 比较不同的嵌入模式
+
 
 # 误码率分析
 # bits_error_rate_analysis()
