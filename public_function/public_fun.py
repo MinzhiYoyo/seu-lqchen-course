@@ -1,6 +1,13 @@
 from PIL import Image, ImageOps
 import numpy as np
 
+def diffbits_with_two_bytes(bytes1, bytes2):
+    if len(bytes1) != len(bytes2):
+        raise ValueError("比特流长度不一样")
+    total_length = len(bytes1) * 8
+    differences = sum(bin(b1 ^ b2).count('1') for b1, b2 in zip(bytes1, bytes2))
+    return differences, total_length
+
 # 比较两个比特流的差异性
 def diff_with_two_bytes(bytes1, bytes2, is_bites = True):
     if len(bytes1) != len(bytes2):
@@ -26,9 +33,11 @@ def diff_with_two_image(image1_path, image2_path, is_bits = True):
     image1 = Image.open(image1_path)
     image2 = Image.open(image2_path)
 
-    image1_bytes = image1.tobytes()
-    image2_bytes = image2.tobytes()
-    return diff_with_two_bytes(image1_bytes, image2_bytes)
+    image1_array = np.array(image1)
+    image2_array = np.array(image2)
+
+
+    return diff_with_two_bytes(image1_array.tobytes(), image2_array.tobytes(), is_bits)
 
 
 
@@ -48,16 +57,16 @@ def image2array(image_path, need_embedded_size = True):
     # 使用RGB排列的方式
     image = Image.open(image_path)
     if not image.mode == 'L':
-        raise ValueError("要求输入图片是灰度（图片必须以JPEG的形式保存的灰度）")
+        raise ValueError("要求输入图片是灰度或者RGBA")
     ret = image.tobytes()
 
     if not need_embedded_size:
-        return np.frombuffer(ret, dtype=np.uint8)
+        return ret
 
     # 宽4个字节来表示，大端序，高4个字节来表示，大端序
     width = image.width.to_bytes(4, 'big')
     height = image.height.to_bytes(4, 'big')
-    return np.frombuffer(width + height + ret, dtype=np.uint8)
+    return width + height + ret
 
 
 # 字节流转图片
@@ -95,14 +104,43 @@ def sort_by_energy_analyze(audio_array: np.ndarray, window_size: int):
         raise ValueError('能量分析中，没有指定能量窗口大小')
     index = range(0, len(audio_array), window_size)[:-1]
 
-    energys = np.zeros(len(index))
+    energys = np.zeros(len(index), dtype=np.float)
     for j, i in enumerate(index):
-        energys[j] = (np.sum(audio_array[i * window_size:(i + 1) * window_size] ** 2))
+        energys[j] = np.sum(np.abs(audio_array[i * window_size:(i + 1) * window_size]))
     return energys.argsort()[::-1]
 
 def png_to_gray_image(input, output):
     image = Image.open(input)
     image = image.convert('L')
-    image = ImageOps.invert(image)
+    # image = ImageOps.invert(image)
     image.save(output)
+    Image.open(output).save(output)  # 多次加载并保存，才会使得两个文件一样，否则会发现两个文件不同，bug未解决，对于灰度图发现的bug，RGBA倒是没有发现
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
+    Image.open(output).save(output)
 
